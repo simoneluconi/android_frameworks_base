@@ -19280,7 +19280,6 @@ package android.hardware.camera2 {
     method @Nullable public android.util.Range<java.lang.Long> getEstimatedCaptureLatencyRangeMillis(int, @NonNull android.util.Size, int);
     method @NonNull public <T> java.util.List<android.util.Size> getExtensionSupportedSizes(int, @NonNull Class<T>);
     method @NonNull public java.util.List<android.util.Size> getExtensionSupportedSizes(int, int);
-    method @FlaggedApi("com.android.internal.camera.flags.camera_extensions_characteristics_get") @NonNull public java.util.Set<android.hardware.camera2.CameraCharacteristics.Key> getKeys(int);
     method @NonNull public java.util.List<android.util.Size> getPostviewSupportedSizes(int, @NonNull android.util.Size, int);
     method @NonNull public java.util.List<java.lang.Integer> getSupportedExtensions();
     method public boolean isCaptureProcessProgressAvailable(int);
