@@ -1446,19 +1446,13 @@ bool BootAnimation::movie() {
         mClockEnabled = false;
     }
 
-    // Check if npot textures are supported
-    mUseNpotTextures = false;
-    String8 gl_extensions;
-    const char* exts = reinterpret_cast<const char*>(glGetString(GL_EXTENSIONS));
-    if (!exts) {
-        glGetError();
-    } else {
-        gl_extensions = exts;
-        if ((gl_extensions.find("GL_ARB_texture_non_power_of_two") != -1) ||
-            (gl_extensions.find("GL_OES_texture_npot") != -1)) {
-            mUseNpotTextures = true;
-        }
-    }
+    // NPOT textures: OpenGL ES 2.0 core already allows them without
+    // mipmaps and with GL_CLAMP_TO_EDGE, which is all this animation uses
+    // (the context is ES 2.0). Without NPOT the textures are padded to a
+    // power of two, but drawTexturedQuad() maps the whole texture onto the
+    // quad, so the uninitialised padding was drawn too: garbled frames on
+    // drivers that do not advertise GL_OES_texture_npot (NVIDIA Tegra 4).
+    mUseNpotTextures = true;
 
     // Blend required to draw time on top of animation frames.
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
