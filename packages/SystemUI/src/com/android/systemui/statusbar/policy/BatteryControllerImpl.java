@@ -543,4 +543,9 @@ public class BatteryControllerImpl extends BroadcastReceiver implements BatteryC
     public boolean isChargingSourceDock() {
         return mPluggedChargingSource == BatteryManager.BATTERY_PLUGGED_DOCK;
     }
+
+    @Override
+    public int getPluggedChargingSource() {
+        return mPluggedChargingSource;
+    }
 }

@@ -1658,6 +1658,11 @@
          overlays. -->
     <item name="physical_charger_port_location_normalized_x" type="dimen" format="float">0.5</item>
     <item name="physical_charger_port_location_normalized_y" type="dimen" format="float">1</item>
+    <!-- Normalized location of a second charging connector, one the device reports as
+         BatteryManager.BATTERY_PLUGGED_AC (a barrel or proprietary power connector next to the
+         USB port). Negative: the device has one connector, the one above. -->
+    <item name="physical_charger_port_ac_location_normalized_x" type="dimen" format="float">-1</item>
+    <item name="physical_charger_port_ac_location_normalized_y" type="dimen" format="float">-1</item>
 
     <!-- Wallet activity screen specs -->
     <dimen name="wallet_icon_size">36sp</dimen>

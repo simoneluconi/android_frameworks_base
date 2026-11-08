@@ -136,6 +136,14 @@ public interface BatteryController extends DemoMode,
     }
 
     /**
+     * Returns the charging source, a {@code BatteryManager.BATTERY_PLUGGED_*} value, or 0 when
+     * unplugged.
+     */
+    default int getPluggedChargingSource() {
+        return 0;
+    }
+
+    /**
      * A listener that will be notified whenever a change in battery level or power save mode has
      * occurred.
      */

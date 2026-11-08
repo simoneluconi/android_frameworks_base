@@ -19,6 +19,7 @@ package com.android.systemui.charging
 import android.content.Context
 import android.content.res.Configuration
 import android.graphics.PixelFormat
+import android.os.BatteryManager
 import android.os.SystemProperties
 import android.view.Surface
 import android.view.View
@@ -61,12 +62,18 @@ class WiredChargingRippleController @Inject constructor(
     private val uiEventLogger: UiEventLogger
 ) {
     private var pluggedIn: Boolean = false
+    private var chargingSource: Int = 0
     private val rippleEnabled: Boolean = featureFlags.isEnabled(Flags.CHARGING_RIPPLE) &&
             !SystemProperties.getBoolean("persist.debug.suppress-charging-ripple", false)
     private var normalizedPortPosX: Float = context.resources.getFloat(
             R.dimen.physical_charger_port_location_normalized_x)
     private var normalizedPortPosY: Float = context.resources.getFloat(
             R.dimen.physical_charger_port_location_normalized_y)
+    // A second connector reported as BATTERY_PLUGGED_AC; negative when there is none.
+    private var normalizedAcPortPosX: Float = context.resources.getFloat(
+            R.dimen.physical_charger_port_ac_location_normalized_x)
+    private var normalizedAcPortPosY: Float = context.resources.getFloat(
+            R.dimen.physical_charger_port_ac_location_normalized_y)
     private val windowLayoutParams = WindowManager.LayoutParams().apply {
         width = WindowManager.LayoutParams.MATCH_PARENT
         height = WindowManager.LayoutParams.MATCH_PARENT
@@ -87,6 +94,7 @@ class WiredChargingRippleController @Inject constructor(
 
     init {
         pluggedIn = batteryController.isPluggedIn
+        chargingSource = batteryController.pluggedChargingSource
         commandRegistry.registerCommand("charging-ripple") { ChargingRippleCommand() }
         updateRippleColor()
     }
@@ -105,10 +113,17 @@ class WiredChargingRippleController @Inject constructor(
                     return
                 }
 
-                if (!pluggedIn && nowPluggedIn) {
-                    startRippleWithDebounce()
+                // Also play it when a second connector takes over: BatteryService reports AC
+                // over USB, so plugging the power connector in while on USB switches the
+                // source to AC. (Removing it switches back to USB: no ripple for that.)
+                val nowSource = batteryController.pluggedChargingSource
+                if (nowPluggedIn && (!pluggedIn || (hasAcPort() &&
+                        nowSource != chargingSource &&
+                        nowSource == BatteryManager.BATTERY_PLUGGED_AC))) {
+                    startRippleWithDebounce(nowSource)
                 }
                 pluggedIn = nowPluggedIn
+                chargingSource = nowSource
             }
         }
         batteryController.addCallback(batteryStateChangeCallback)
@@ -126,19 +141,23 @@ class WiredChargingRippleController @Inject constructor(
                         R.dimen.physical_charger_port_location_normalized_x)
                 normalizedPortPosY = context.resources.getFloat(
                         R.dimen.physical_charger_port_location_normalized_y)
+                normalizedAcPortPosX = context.resources.getFloat(
+                        R.dimen.physical_charger_port_ac_location_normalized_x)
+                normalizedAcPortPosY = context.resources.getFloat(
+                        R.dimen.physical_charger_port_ac_location_normalized_y)
             }
         }
         configurationController.addCallback(configurationChangedListener)
     }
 
     // Lazily debounce ripple to avoid triggering ripple constantly (e.g. from flaky chargers).
-    internal fun startRippleWithDebounce() {
+    internal fun startRippleWithDebounce(source: Int = batteryController.pluggedChargingSource) {
         val now = systemClock.elapsedRealtime()
         // Debounce wait time = 2 ^ debounce level
         if (lastTriggerTime == null ||
                 (now - lastTriggerTime!!) > BASE_DEBOUNCE_TIME * (2.0.pow(debounceLevel))) {
             // Not waiting for debounce. Start ripple.
-            startRipple()
+            startRipple(source)
             debounceLevel = 0
         } else {
             // Still waiting for debounce. Ignore ripple and bump debounce level.
@@ -147,7 +166,10 @@ class WiredChargingRippleController @Inject constructor(
         lastTriggerTime = now
     }
 
-    fun startRipple() {
+    fun startRipple() = startRipple(batteryController.pluggedChargingSource)
+
+    /** [source] is a BatteryManager.BATTERY_PLUGGED_* value: it picks the connector. */
+    fun startRipple(source: Int) {
         if (rippleView.rippleInProgress() || rippleView.parent != null) {
             // Skip if ripple is still playing, or not playing but already added the parent
             // (which might happen just before the animation starts or right after
@@ -159,7 +181,7 @@ class WiredChargingRippleController @Inject constructor(
             override fun onViewDetachedFromWindow(view: View) {}
 
             override fun onViewAttachedToWindow(view: View) {
-                layoutRipple()
+                layoutRipple(source)
                 rippleView.startRipple(Runnable {
                     windowManager.removeView(rippleView)
                 })
@@ -170,28 +192,29 @@ class WiredChargingRippleController @Inject constructor(
         uiEventLogger.log(WiredChargingRippleEvent.CHARGING_RIPPLE_PLAYED)
     }
 
-    private fun layoutRipple() {
+    private fun hasAcPort() = normalizedAcPortPosX >= 0f && normalizedAcPortPosY >= 0f
+
+    private fun layoutRipple(source: Int) {
         val bounds = windowManager.currentWindowMetrics.bounds
         val width = bounds.width()
         val height = bounds.height()
         val maxDiameter = Integer.max(width, height) * 2f
         rippleView.setMaxSize(maxDiameter, maxDiameter)
+        val ac = source == BatteryManager.BATTERY_PLUGGED_AC && hasAcPort()
+        val portX = if (ac) normalizedAcPortPosX else normalizedPortPosX
+        val portY = if (ac) normalizedAcPortPosY else normalizedPortPosY
         when (context.display?.rotation) {
             Surface.ROTATION_0 -> {
-                rippleView.setCenter(
-                        width * normalizedPortPosX, height * normalizedPortPosY)
+                rippleView.setCenter(width * portX, height * portY)
             }
             Surface.ROTATION_90 -> {
-                rippleView.setCenter(
-                        width * normalizedPortPosY, height * (1 - normalizedPortPosX))
+                rippleView.setCenter(width * portY, height * (1 - portX))
             }
             Surface.ROTATION_180 -> {
-                rippleView.setCenter(
-                        width * (1 - normalizedPortPosX), height * (1 - normalizedPortPosY))
+                rippleView.setCenter(width * (1 - portX), height * (1 - portY))
             }
             Surface.ROTATION_270 -> {
-                rippleView.setCenter(
-                        width * (1 - normalizedPortPosY), height * normalizedPortPosX)
+                rippleView.setCenter(width * (1 - portY), height * portX)
             }
         }
     }
@@ -202,11 +225,15 @@ class WiredChargingRippleController @Inject constructor(
 
     inner class ChargingRippleCommand : Command {
         override fun execute(pw: PrintWriter, args: List<String>) {
-            startRipple()
+            when (args.firstOrNull()) {
+                "ac" -> startRipple(BatteryManager.BATTERY_PLUGGED_AC)
+                "usb" -> startRipple(BatteryManager.BATTERY_PLUGGED_USB)
+                else -> startRipple()
+            }
         }
 
         override fun help(pw: PrintWriter) {
-            pw.println("Usage: adb shell cmd statusbar charging-ripple")
+            pw.println("Usage: adb shell cmd statusbar charging-ripple [ac|usb]")
         }
     }
 
