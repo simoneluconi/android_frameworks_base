@@ -187,6 +187,7 @@ public class PowerUI implements
         mReceiver.init();
         mUserTracker.addCallback(mUserChangedCallback, mContext.getMainExecutor());
         mWakefulnessLifecycle.addObserver(mWakefulnessObserver);
+        new AutoPowerOff(mContext, mHandler, mBroadcastDispatcher, mWakefulnessLifecycle).start();
 
         // Check to see if we need to let the user know that the phone previously shut down due
         // to the temperature being too high.

@@ -71,4 +71,9 @@
 
     <!-- Whether to play turbulence noise after clicking the play button -->
     <bool name="config_turbulenceNoise">true</bool>
+
+    <!-- Auto power off: the default time, in ms, the device may stay asleep and unplugged
+         before it powers itself off. The user changes it in Settings > Battery
+         (Settings.Global auto_power_off_timeout, 0 = never). -1 disables the feature. -->
+    <integer name="config_autoPowerOffTimeout">-1</integer>
 </resources>
