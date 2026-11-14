@@ -4855,6 +4855,23 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         startActivityAsUser(intent, null, handle);
     }
 
+    /**
+     * A shutter press that wakes the device opens the camera at once, as on a camera, when
+     * the "launch camera" button setting is on (with the screen on it stays a long press).
+     * Not with "peek" (sleep on release), where the half press only shows the screen.
+     */
+    private void launchCameraOnWake(boolean keyguardActive) {
+        if (!mCameraLaunch || mCameraSleepOnRelease
+                || mCameraAvailabilityListener.isAnyCameraInUse()) {
+            return;
+        }
+        Intent intent = new Intent(keyguardActive
+                ? MediaStore.INTENT_ACTION_STILL_IMAGE_CAMERA_SECURE
+                : MediaStore.INTENT_ACTION_STILL_IMAGE_CAMERA);
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        startActivityAsUser(intent, UserHandle.CURRENT_OR_SELF);
+    }
+
     private void startActivityAsUser(Intent intent, Bundle bundle, UserHandle handle) {
         startActivityAsUser(intent, bundle, handle, false /* allowDuringSetup */);
     }
@@ -5453,6 +5470,9 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                 break;
 
             case KeyEvent.KEYCODE_FOCUS:
+                if (down && !interactive && isWakeKey) {
+                    launchCameraOnWake(keyguardActive);
+                }
                 if (down && !interactive && mCameraSleepOnRelease) {
                     mIsFocusPressed = true;
                 } else if (!down) {
@@ -5472,6 +5492,9 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                 }
                 if (down) {
                     mIsLongPress = false;
+                    if (!interactive && isWakeKey) {
+                        launchCameraOnWake(keyguardActive);
+                    }
 
                     KeyEvent newEvent = new KeyEvent(event.getDownTime(), event.getEventTime(),
                             event.getAction(), keyCode, 0);
