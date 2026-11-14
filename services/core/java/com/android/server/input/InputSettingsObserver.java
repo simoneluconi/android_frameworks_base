@@ -132,7 +132,17 @@ class InputSettingsObserver extends ContentObserver {
 
     @Override
     public void onChange(boolean selfChange, Uri uri) {
-        mObservers.get(uri).accept("setting changed");
+        // A change to a whole table (LineageSettingsProvider notifies content://lineagesettings/
+        // system on a delete) reaches every observer below it with a uri that is none of ours:
+        // re-read them all instead of crashing system_server.
+        final Consumer<String> observer = mObservers.get(uri);
+        if (observer != null) {
+            observer.accept("setting changed");
+            return;
+        }
+        for (Consumer<String> o : mObservers.values()) {
+            o.accept("setting changed");
+        }
     }
 
     private boolean getBoolean(String settingName, boolean defaultValue) {
